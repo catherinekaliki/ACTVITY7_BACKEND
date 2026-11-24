@@ -13,13 +13,13 @@ VALUES
  'Printer cannot connect to the campus network.', 'Pending'),
 
 ('Keyboard Not Working', 'Hardware',
- 'Some keyboard keys are not responding.', 'In progress'),
+ 'The keyboard is not responding when typing.', 'In progress'),
 
 ('Operating System Update', 'Software',
  'Request to update the computer operating system.', 'Completed'),
 
 ('Internet Connection Slow', 'Network',
- 'Internet connection is extremely slow.', 'Pending'),
+ 'The internet connection is extremely slow.', 'Pending'),
 
 ('Monitor Display Problem', 'Hardware',
- 'Monitor displays a blank screen.', 'Pending');
+ 'The monitor is not displaying anything.', 'Pending');

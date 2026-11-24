@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
+const initDatabase = require('./initDb');
 
 const app = express();
 const recordsRoutes = require('./routes/records');
@@ -21,6 +22,8 @@ app.use(express.json());
 
 // Home route - API Guide
 app.get('/', (req, res) => {
+    const apiBaseUrl = `${req.protocol}://${req.get('host')}`;
+
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -64,10 +67,14 @@ app.get('/', (req, res) => {
                 <h1>IT Support Desk API</h1>
                 <p>Student Name: Catherine Kaliki</p>
                 <p>Student Number: 202508939</p>
+
                 <p>
                     This API manages IT support requests
                     for the IT Support Desk system.
                 </p>
+
+                <h2>API Base URL</h2>
+                <p><a href="${apiBaseUrl}">${apiBaseUrl}</a></p>
 
                 <h2>API Links</h2>
                 <p><a href="/health">Health Check</a></p>
@@ -87,6 +94,7 @@ app.get('/', (req, res) => {
 
                 <h2>Input Fields</h2>
                 <p>title, category, description and status</p>
+                <p>Allowed categories: Network, Software, Hardware</p>
                 <p>Allowed statuses: Pending, In progress, Completed</p>
 
                 <h2>Example JSON Body</h2>
@@ -112,16 +120,18 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Health check - checks database connection
-app.get('/health', (req, res) => {
+// Health check - checks PostgreSQL connection
+app.get('/health', async (req, res) => {
     try {
-        db.prepare('SELECT 1').get();
+        await db.query('SELECT 1');
 
         res.status(200).json({
             status: 'OK',
             message: 'IT Support Desk API and database are healthy'
         });
     } catch (error) {
+        console.error('Health check failed:', error);
+
         res.status(503).json({
             message: 'Database connection failed'
         });
@@ -140,7 +150,9 @@ app.use((req, res) => {
 
 // Handle malformed JSON and other errors
 app.use((error, req, res, next) => {
-    if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
+    if (error instanceof SyntaxError &&
+        error.status === 400 &&
+        'body' in error) {
         return res.status(400).json({
             message: 'Invalid JSON format'
         });
@@ -153,9 +165,16 @@ app.use((error, req, res, next) => {
     });
 });
 
-// Start server
+// Initialise database before starting server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`IT Support Desk API running on port ${PORT}`);
-});
+initDatabase()
+    .then(() => {
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`IT Support Desk API running on port ${PORT}`);
+        });
+    })
+    .catch((error) => {
+        console.error('Unable to start API:', error);
+        process.exit(1);
+    });

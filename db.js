@@ -1,32 +1,20 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
 
-const dbPath = path.join(__dirname, 'it_support_desk.db');
-const db = new Database(dbPath);
+const { Pool } = require('pg');
 
-db.pragma('journal_mode = WAL');
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
 
-// Create the records table
-const schema = fs.readFileSync(
-    path.join(__dirname, 'schema.sql'),
-    'utf8'
-);
-db.exec(schema);
+db.on('connect', () => {
+    console.log('Connected to PostgreSQL database successfully');
+});
 
-// Insert sample records only if the table is empty
-const count = db.prepare(
-    'SELECT COUNT(*) AS count FROM records'
-).get();
-
-if (count.count === 0) {
-    const seed = fs.readFileSync(
-        path.join(__dirname, 'seed.sql'),
-        'utf8'
-    );
-    db.exec(seed);
-}
-
-console.log('Connected to SQLite database successfully');
+db.on('error', (error) => {
+    console.error('Unexpected database error:', error);
+});
 
 module.exports = db;

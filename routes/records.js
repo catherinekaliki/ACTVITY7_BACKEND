@@ -5,7 +5,6 @@ const db = require('../db');
 const validCategories = ['Network', 'Software', 'Hardware'];
 const validStatuses = ['Pending', 'In progress', 'Completed'];
 
-// Validate record information
 function validateRecord(data = {}) {
     const { title, category, description, status } = data;
 
@@ -36,32 +35,31 @@ function validateRecord(data = {}) {
     return null;
 }
 
-// Validate record ID
 function validateId(id) {
-    const number = Number(id);
-
-    if (!Number.isSafeInteger(number) || number <= 0) {
+    if (!/^[1-9]\d*$/.test(id)) {
         return null;
     }
 
-    return number;
+    const number = Number(id);
+
+    return Number.isSafeInteger(number) ? number : null;
 }
 
-// GET: Retrieve all records
-router.get('/', (req, res, next) => {
+// GET ALL RECORDS
+router.get('/', async (req, res, next) => {
     try {
-        const records = db.prepare(
+        const result = await db.query(
             'SELECT * FROM records ORDER BY id ASC'
-        ).all();
+        );
 
-        res.status(200).json(records);
+        res.status(200).json(result.rows);
     } catch (error) {
         next(error);
     }
 });
 
-// GET: Retrieve one record
-router.get('/:id', (req, res, next) => {
+// GET ONE RECORD
+router.get('/:id', async (req, res, next) => {
     try {
         const id = validateId(req.params.id);
 
@@ -71,24 +69,25 @@ router.get('/:id', (req, res, next) => {
             });
         }
 
-        const record = db.prepare(
-            'SELECT * FROM records WHERE id = ?'
-        ).get(id);
+        const result = await db.query(
+            'SELECT * FROM records WHERE id = $1',
+            [id]
+        );
 
-        if (!record) {
+        if (result.rows.length === 0) {
             return res.status(404).json({
                 message: 'Record not found.'
             });
         }
 
-        res.status(200).json(record);
+        res.status(200).json(result.rows[0]);
     } catch (error) {
         next(error);
     }
 });
 
-// POST: Create a new record
-router.post('/', (req, res, next) => {
+// CREATE RECORD
+router.post('/', async (req, res, next) => {
     try {
         const errorMessage = validateRecord(req.body);
 
@@ -100,29 +99,22 @@ router.post('/', (req, res, next) => {
 
         const { title, category, description, status } = req.body;
 
-        const result = db.prepare(`
-            INSERT INTO records
+        const result = await db.query(
+            `INSERT INTO records
             (title, category, description, status)
-            VALUES (?, ?, ?, ?)
-        `).run(
-            title.trim(),
-            category,
-            description.trim(),
-            status
+            VALUES ($1, $2, $3, $4)
+            RETURNING *`,
+            [title.trim(), category, description.trim(), status]
         );
 
-        const record = db.prepare(
-            'SELECT * FROM records WHERE id = ?'
-        ).get(result.lastInsertRowid);
-
-        res.status(201).json(record);
+        res.status(201).json(result.rows[0]);
     } catch (error) {
         next(error);
     }
 });
 
-// PUT: Update an existing record
-router.put('/:id', (req, res, next) => {
+// UPDATE RECORD
+router.put('/:id', async (req, res, next) => {
     try {
         const id = validateId(req.params.id);
 
@@ -142,40 +134,32 @@ router.put('/:id', (req, res, next) => {
 
         const { title, category, description, status } = req.body;
 
-        const result = db.prepare(`
-            UPDATE records
-            SET title = ?,
-                category = ?,
-                description = ?,
-                status = ?,
+        const result = await db.query(
+            `UPDATE records
+            SET title = $1,
+                category = $2,
+                description = $3,
+                status = $4,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
-            title.trim(),
-            category,
-            description.trim(),
-            status,
-            id
+            WHERE id = $5
+            RETURNING *`,
+            [title.trim(), category, description.trim(), status, id]
         );
 
-        if (result.changes === 0) {
+        if (result.rows.length === 0) {
             return res.status(404).json({
                 message: 'Record not found.'
             });
         }
 
-        const record = db.prepare(
-            'SELECT * FROM records WHERE id = ?'
-        ).get(id);
-
-        res.status(200).json(record);
+        res.status(200).json(result.rows[0]);
     } catch (error) {
         next(error);
     }
 });
 
-// DELETE: Delete a record
-router.delete('/:id', (req, res, next) => {
+// DELETE RECORD
+router.delete('/:id', async (req, res, next) => {
     try {
         const id = validateId(req.params.id);
 
@@ -185,11 +169,12 @@ router.delete('/:id', (req, res, next) => {
             });
         }
 
-        const result = db.prepare(
-            'DELETE FROM records WHERE id = ?'
-        ).run(id);
+        const result = await db.query(
+            'DELETE FROM records WHERE id = $1 RETURNING id',
+            [id]
+        );
 
-        if (result.changes === 0) {
+        if (result.rows.length === 0) {
             return res.status(404).json({
                 message: 'Record not found.'
             });
